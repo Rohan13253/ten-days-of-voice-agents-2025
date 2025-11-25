@@ -1,0 +1,14 @@
+[
+  {
+    "id": "variables",
+    "title": "Variables",
+    "summary": "A variable is like a named box in memory...",
+    "sample_question": "Why do we use variables instead of hard-coding values?"
+  },
+  {
+    "id": "loops",
+    "title": "Loops",
+    "summary": "Loops allow repeating code multiple times...",
+    "sample_question": "What is the difference between For and While loops?"
+  }
+]
