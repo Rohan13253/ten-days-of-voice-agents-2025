@@ -1,0 +1,15 @@
+[
+  {
+    "username": "Rohan",
+    "security_identifier": "1995",
+    "card_last4": "8892",
+    "transaction": {
+      "merchant": "Apple Store Mumbai",
+      "amount": "1,29,900 INR",
+      "time": "Today at 2:30 PM",
+      "location": "Mumbai, India"
+    },
+    "status": "pending_review",
+    "notes": "Initial alert triggered."
+  }
+]

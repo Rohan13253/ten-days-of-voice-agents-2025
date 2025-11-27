@@ -1,6 +1,5 @@
 import logging
 import json
-from datetime import datetime
 from dotenv import load_dotenv
 from livekit.agents import (
     Agent,
@@ -20,81 +19,93 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 logger = logging.getLogger("agent")
 load_dotenv(".env.local")
 
-# --- 1. LOAD KNOWLEDGE BASE ---
-def load_faq():
+# --- DATABASE HANDLER ---
+DB_FILE = "fraud_db.json"
+
+def load_case(username="Rohan"):
     try:
-        with open("day5_zomato_faq.json", "r") as f:
-            return json.load(f)
+        with open(DB_FILE, "r") as f:
+            data = json.load(f)
+            # Find the user
+            for case in data:
+                if case["username"] == username:
+                    return case
     except:
-        return []
+        pass
+    return None
 
-FAQ_DATA = load_faq()
-FAQ_TEXT = json.dumps(FAQ_DATA, indent=2)
+def update_db(username, new_status, note):
+    try:
+        with open(DB_FILE, "r") as f:
+            data = json.load(f)
+        
+        for case in data:
+            if case["username"] == username:
+                case["status"] = new_status
+                case["notes"] = note
+                break
+        
+        with open(DB_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"💾 DATABASE UPDATED: {new_status} - {note}")
+    except Exception as e:
+        print(f"Error updating DB: {e}")
 
-# --- 2. THE SDR AGENT ---
-class ZomatoSDR(Agent):
+# --- AGENT LOGIC ---
+class FraudAlertAgent(Agent):
     def __init__(self):
-        super().__init__(
-            instructions=(
-                "You are 'Matthew', a Zomato Sales Representative.\n"
-                "Your goal is to help restaurant owners list their business on Zomato.\n\n"
-                f"USE THIS KNOWLEDGE BASE FOR ANSWERS:\n{FAQ_TEXT}\n\n"
-                "YOUR TASKS:\n"
-                "1. Greet the user warmly.\n"
-                "2. Answer their questions about Zomato (Cost, Delivery, Documents).\n"
-                "3. CRITICAL: You must collect these 4 pieces of info to create a lead:\n"
-                "   - Name\n"
-                "   - Restaurant Name\n"
-                "   - Phone Number\n"
-                "   - City\n"
-                "4. Once you have ALL 4, call the 'capture_lead' tool immediately.\n"
-                "5. Keep your answers short and professional."
-            )
+        # Load the case for "Rohan" automatically for this demo
+        self.case = load_case("Rohan")
+        
+        # Build the dynamic prompt based on the DB entry
+        txn = self.case['transaction']
+        context_prompt = (
+            f"You are an HDFC Bank Fraud Prevention Officer.\n"
+            f"You are calling the customer '{self.case['username']}' about a suspicious transaction on card ending {self.case['card_last4']}.\n\n"
+            f"TRANSACTION DETAILS:\n"
+            f"- Merchant: {txn['merchant']}\n"
+            f"- Amount: {txn['amount']}\n"
+            f"- Time: {txn['time']}\n\n"
+            "YOUR FLOW:\n"
+            "1. Introduce yourself as HDFC Fraud Dept. Ask if you are speaking to the customer.\n"
+            "2. VERIFICATION: Before discussing details, ask for their 'Year of Birth' to verify identity.\n"
+            "3. If they give the wrong year (not " + self.case['security_identifier'] + "), say you cannot proceed and call 'end_call_failed'.\n"
+            "4. If verified, read the transaction details clearly.\n"
+            "5. Ask: 'Did you authorize this transaction?'\n"
+            "6. If YES -> Call 'mark_safe'.\n"
+            "7. If NO -> Call 'mark_fraud'.\n"
+            "Keep your tone professional, calm, and serious."
         )
 
+        super().__init__(instructions=context_prompt)
+
     @function_tool
-    async def capture_lead(self, context: RunContext, name: str, restaurant_name: str, phone: str, city: str):
-        """
-        Call this tool ONLY when you have collected Name, Restaurant Name, Phone, and City.
-        """
-        lead_data = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "name": name,
-            "restaurant": restaurant_name,
-            "phone": phone,
-            "city": city,
-            "status": "Qualified"
-        }
-        
-        # Save to JSON file
-        filename = "zomato_leads.json"
-        existing_leads = []
-        
-        try:
-            with open(filename, "r") as f:
-                existing_leads = json.load(f)
-        except:
-            pass # File doesn't exist yet, start empty
+    async def mark_safe(self, context: RunContext):
+        """Call this if the customer confirms they MADE the transaction (it is safe)."""
+        update_db("Rohan", "confirmed_safe", "Customer verified transaction via Voice.")
+        return "Thank you. I have marked this transaction as safe. You can continue using your card. Goodbye."
 
-        existing_leads.append(lead_data)
-        
-        with open(filename, "w") as f:
-            json.dump(existing_leads, f, indent=2)
-            
-        print(f"✅ LEAD SAVED: {lead_data}")
-        return "Perfect! I have saved your details. Our onboarding team will call you within 24 hours."
+    @function_tool
+    async def mark_fraud(self, context: RunContext):
+        """Call this if the customer says they DID NOT make the transaction (it is fraud)."""
+        update_db("Rohan", "confirmed_fraud", "Customer denied transaction. Card blocked immediately.")
+        return "Understood. I have blocked your card immediately to prevent further loss. You will receive a new card in 3-5 working days."
 
-# --- 3. STARTUP LOGIC ---
+    @function_tool
+    async def end_call_failed(self, context: RunContext):
+        """Call this if identity verification fails."""
+        update_db("Rohan", "verification_failed", "Caller failed security question.")
+        return "I am sorry, but I cannot verify your identity. Please visit your nearest branch. Goodbye."
+
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 
 async def entrypoint(ctx: JobContext):
-    ctx.log_context_fields = {"room": ctx.room.name}
     await ctx.connect()
-
-    # Using the SAFE Voice (Matthew) + SAFE STT (Nova-2)
+    
+    # Use a professional, deep voice for the Bank Officer
     tts = murf.TTS(
-        voice="en-US-matthew",
+        voice="en-US-matthew", 
         style="Conversation",
         tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
         text_pacing=True
@@ -108,13 +119,10 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
     )
 
-    await session.start(
-        agent=ZomatoSDR(),
-        room=ctx.room,
-        room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()),
-    )
+    await session.start(agent=FraudAlertAgent(), room=ctx.room, room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()))
     
-    await session.agent.say("Hello! Welcome to Zomato Partner Support. Are you looking to list your restaurant?", allow_interruptions=True)
+    # Start the call immediately
+    await session.agent.say("Hello. This is a call from HDFC Bank Fraud Prevention. Am I speaking with Rohan?", allow_interruptions=True)
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))
