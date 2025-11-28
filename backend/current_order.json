@@ -1,0 +1,32 @@
+{
+  "timestamp": "2025-11-28 16:22:15",
+  "items": [
+    {
+      "item": "Toned Milk (1L)",
+      "qty": 1,
+      "price": 70
+    },
+    {
+      "item": "Salted Chips",
+      "qty": 1,
+      "price": 20
+    },
+    {
+      "item": "Whole Wheat Bread",
+      "qty": 1,
+      "price": 40
+    },
+    {
+      "item": "Peanut Butter",
+      "qty": 1,
+      "price": 150
+    },
+    {
+      "item": "Fruit Jam",
+      "qty": 1,
+      "price": 120
+    }
+  ],
+  "total": 400,
+  "status": "Placed"
+}

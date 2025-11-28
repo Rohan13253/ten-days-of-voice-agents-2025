@@ -1,0 +1,14 @@
+[
+  {"id": "g1", "name": "Whole Wheat Bread", "price": 40, "category": "Bakery"},
+  {"id": "g2", "name": "Peanut Butter", "price": 150, "category": "Spreads"},
+  {"id": "g3", "name": "Fruit Jam", "price": 120, "category": "Spreads"},
+  {"id": "g4", "name": "Farm Fresh Eggs (6pcs)", "price": 60, "category": "Dairy"},
+  {"id": "g5", "name": "Toned Milk (1L)", "price": 70, "category": "Dairy"},
+  {"id": "p1", "name": "Pasta Packet", "price": 100, "category": "Pantry"},
+  {"id": "p2", "name": "Tomato Pasta Sauce", "price": 180, "category": "Pantry"},
+  {"id": "p3", "name": "Cheddar Cheese Block", "price": 250, "category": "Dairy"},
+  {"id": "v1", "name": "Potatoes (1kg)", "price": 50, "category": "Vegetables"},
+  {"id": "v2", "name": "Onions (1kg)", "price": 60, "category": "Vegetables"},
+  {"id": "s1", "name": "Salted Chips", "price": 20, "category": "Snacks"},
+  {"id": "s2", "name": "Coca Cola (500ml)", "price": 40, "category": "Beverages"}
+]

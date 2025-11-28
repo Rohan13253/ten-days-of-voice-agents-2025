@@ -1,5 +1,6 @@
 import logging
 import json
+from datetime import datetime
 from dotenv import load_dotenv
 from livekit.agents import (
     Agent,
@@ -19,83 +20,90 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 logger = logging.getLogger("agent")
 load_dotenv(".env.local")
 
-# --- DATABASE HANDLER ---
-DB_FILE = "fraud_db.json"
-
-def load_case(username="Rohan"):
+# --- 1. LOAD CATALOG ---
+def load_catalog():
     try:
-        with open(DB_FILE, "r") as f:
-            data = json.load(f)
-            # Find the user
-            for case in data:
-                if case["username"] == username:
-                    return case
+        with open("grocery_catalog.json", "r") as f:
+            return json.load(f)
     except:
-        pass
-    return None
+        return []
 
-def update_db(username, new_status, note):
-    try:
-        with open(DB_FILE, "r") as f:
-            data = json.load(f)
-        
-        for case in data:
-            if case["username"] == username:
-                case["status"] = new_status
-                case["notes"] = note
-                break
-        
-        with open(DB_FILE, "w") as f:
-            json.dump(data, f, indent=2)
-        print(f"💾 DATABASE UPDATED: {new_status} - {note}")
-    except Exception as e:
-        print(f"Error updating DB: {e}")
+CATALOG = load_catalog()
+CATALOG_TEXT = json.dumps(CATALOG, indent=2)
 
-# --- AGENT LOGIC ---
-class FraudAlertAgent(Agent):
+RECIPES = {
+    "sandwich": ["Whole Wheat Bread", "Peanut Butter", "Fruit Jam"],
+    "pasta": ["Pasta Packet", "Tomato Pasta Sauce", "Cheddar Cheese Block"],
+    "omelette": ["Farm Fresh Eggs (6pcs)", "Onions (1kg)", "Salted Chips"]
+}
+
+class GroceryAgent(Agent):
     def __init__(self):
-        # Load the case for "Rohan" automatically for this demo
-        self.case = load_case("Rohan")
-        
-        # Build the dynamic prompt based on the DB entry
-        txn = self.case['transaction']
-        context_prompt = (
-            f"You are an HDFC Bank Fraud Prevention Officer.\n"
-            f"You are calling the customer '{self.case['username']}' about a suspicious transaction on card ending {self.case['card_last4']}.\n\n"
-            f"TRANSACTION DETAILS:\n"
-            f"- Merchant: {txn['merchant']}\n"
-            f"- Amount: {txn['amount']}\n"
-            f"- Time: {txn['time']}\n\n"
-            "YOUR FLOW:\n"
-            "1. Introduce yourself as HDFC Fraud Dept. Ask if you are speaking to the customer.\n"
-            "2. VERIFICATION: Before discussing details, ask for their 'Year of Birth' to verify identity.\n"
-            "3. If they give the wrong year (not " + self.case['security_identifier'] + "), say you cannot proceed and call 'end_call_failed'.\n"
-            "4. If verified, read the transaction details clearly.\n"
-            "5. Ask: 'Did you authorize this transaction?'\n"
-            "6. If YES -> Call 'mark_safe'.\n"
-            "7. If NO -> Call 'mark_fraud'.\n"
-            "Keep your tone professional, calm, and serious."
+        super().__init__(
+            instructions=(
+                "You are 'Swiggy Genie', a grocery assistant.\n"
+                f"CATALOG:\n{CATALOG_TEXT}\n"
+                "1. Add items to cart when asked.\n"
+                "2. If user asks for 'ingredients for X', call 'add_recipe_bundle'.\n"
+                "3. If user asks 'what is in my cart' or 'what did you add', YOU MUST call 'check_cart'.\n"
+                "4. If user says 'checkout' or 'done', call 'place_order'."
+            )
         )
-
-        super().__init__(instructions=context_prompt)
-
-    @function_tool
-    async def mark_safe(self, context: RunContext):
-        """Call this if the customer confirms they MADE the transaction (it is safe)."""
-        update_db("Rohan", "confirmed_safe", "Customer verified transaction via Voice.")
-        return "Thank you. I have marked this transaction as safe. You can continue using your card. Goodbye."
+        self.cart = []
 
     @function_tool
-    async def mark_fraud(self, context: RunContext):
-        """Call this if the customer says they DID NOT make the transaction (it is fraud)."""
-        update_db("Rohan", "confirmed_fraud", "Customer denied transaction. Card blocked immediately.")
-        return "Understood. I have blocked your card immediately to prevent further loss. You will receive a new card in 3-5 working days."
+    async def add_to_cart(self, context: RunContext, item_name: str, quantity: int):
+        print(f"🛒 ADDING: {item_name}")
+        item_details = next((x for x in CATALOG if x['name'].lower() == item_name.lower()), None)
+        price = item_details['price'] if item_details else 0
+        self.cart.append({"item": item_name, "qty": quantity, "price": price})
+        return f"Added {quantity} {item_name}."
 
     @function_tool
-    async def end_call_failed(self, context: RunContext):
-        """Call this if identity verification fails."""
-        update_db("Rohan", "verification_failed", "Caller failed security question.")
-        return "I am sorry, but I cannot verify your identity. Please visit your nearest branch. Goodbye."
+    async def add_recipe_bundle(self, context: RunContext, dish_name: str):
+        print(f"🍳 BUNDLING: {dish_name}")
+        dish_key = dish_name.lower()
+        found_key = next((k for k in RECIPES.keys() if k in dish_key), None)
+        
+        if not found_key: return "No recipe found."
+            
+        items_to_add = RECIPES[found_key]
+        added_list = []
+        for item in items_to_add:
+            cat_item = next((x for x in CATALOG if x['name'] == item), None)
+            price = cat_item['price'] if cat_item else 0
+            self.cart.append({"item": item, "qty": 1, "price": price})
+            added_list.append(item)
+            
+        return f"Success! I have added these ingredients for {dish_name}: {', '.join(added_list)}."
+
+    @function_tool
+    async def check_cart(self, context: RunContext):
+        """Use this to see what is in the cart."""
+        print("👀 CHECKING CART")
+        if not self.cart: return "Your cart is empty."
+        
+        # Create a nice summary string
+        summary = ", ".join([f"{x['qty']} x {x['item']}" for x in self.cart])
+        return f"Here is your cart: {summary}"
+
+    @function_tool
+    async def place_order(self, context: RunContext):
+        print("✅ PLACING ORDER")
+        if not self.cart: return "Cart is empty."
+        
+        total = sum(x['qty'] * x['price'] for x in self.cart)
+        order_data = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "items": self.cart,
+            "total": total,
+            "status": "Placed"
+        }
+        with open("current_order.json", "w") as f:
+            json.dump(order_data, f, indent=2)
+        
+        self.cart = []
+        return f"Order placed! Total is {total} rupees. Saved to invoice."
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
@@ -103,9 +111,9 @@ def prewarm(proc: JobProcess):
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
     
-    # Use a professional, deep voice for the Bank Officer
+    # Safe Voice (Matthew)
     tts = murf.TTS(
-        voice="en-US-matthew", 
+        voice="en-US-matthew",
         style="Conversation",
         tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
         text_pacing=True
@@ -119,10 +127,8 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
     )
 
-    await session.start(agent=FraudAlertAgent(), room=ctx.room, room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()))
-    
-    # Start the call immediately
-    await session.agent.say("Hello. This is a call from HDFC Bank Fraud Prevention. Am I speaking with Rohan?", allow_interruptions=True)
+    await session.start(agent=GroceryAgent(), room=ctx.room, room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()))
+    await session.agent.say("Hi! Swiggy Genie here. What do you need?", allow_interruptions=True)
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))

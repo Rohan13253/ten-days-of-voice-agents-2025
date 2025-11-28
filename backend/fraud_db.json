@@ -1,7 +1,7 @@
 [
   {
     "username": "Rohan",
-    "security_identifier": "1995",
+    "security_identifier": "2004",
     "card_last4": "8892",
     "transaction": {
       "merchant": "Apple Store Mumbai",
@@ -9,7 +9,7 @@
       "time": "Today at 2:30 PM",
       "location": "Mumbai, India"
     },
-    "status": "pending_review",
-    "notes": "Initial alert triggered."
+    "status": "confirmed_fraud",
+    "notes": "Customer denied transaction. Card blocked immediately."
   }
 ]
