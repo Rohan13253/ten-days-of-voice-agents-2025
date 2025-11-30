@@ -1,0 +1,32 @@
+[
+  {
+    "order_id": "ORD-1764502771",
+    "timestamp": "2025-11-30 17:09:31",
+    "item": "Men's Black Hoodie (M)",
+    "qty": 1,
+    "total": 1200,
+    "currency": "INR",
+    "status": "CONFIRMED"
+  },
+  {
+    "order_id": "ORD-1764503901",
+    "timestamp": "2025-11-30 17:28:21",
+    "items": [
+      {
+        "name": "Men's Black Hoodie (M)",
+        "qty": 1,
+        "price": 1200,
+        "currency": "INR"
+      },
+      {
+        "name": "Wireless Bluetooth Earbuds",
+        "qty": 1,
+        "price": 2500,
+        "currency": "INR"
+      }
+    ],
+    "total_amount": 3700,
+    "currency": "INR",
+    "status": "CONFIRMED"
+  }
+]

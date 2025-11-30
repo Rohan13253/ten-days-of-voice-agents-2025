@@ -1,0 +1,42 @@
+[
+  {
+    "id": "item_001",
+    "name": "Classic White Coffee Mug",
+    "price": 450,
+    "currency": "INR",
+    "category": "Home & Kitchen",
+    "description": "Minimalist ceramic mug."
+  },
+  {
+    "id": "item_002",
+    "name": "Men's Black Hoodie (M)",
+    "price": 1200,
+    "currency": "INR",
+    "category": "Apparel",
+    "description": "Cotton blend hoodie."
+  },
+  {
+    "id": "item_003",
+    "name": "Wireless Bluetooth Earbuds",
+    "price": 2500,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "Noise cancelling, 20h battery."
+  },
+  {
+    "id": "item_004",
+    "name": "Organic Green Tea (50 Pack)",
+    "price": 350,
+    "currency": "INR",
+    "category": "Grocery",
+    "description": "Premium tea leaves."
+  },
+  {
+    "id": "item_005",
+    "name": "Running Shoes (Size 9)",
+    "price": 3800,
+    "currency": "INR",
+    "category": "Footwear",
+    "description": "Lightweight training shoes."
+  }
+]
